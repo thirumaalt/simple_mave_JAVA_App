@@ -1,14 +1,34 @@
-# Use an official OpenJDK runtime as a parent image
-FROM openjdk:8-jdk-alpine
+# Stage 1: Build the application
+FROM maven:3.8.6-openjdk-8 AS build
 
-# Set the working directory in the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Copy the Maven wrapper scripts and .mvn directory into the container
+COPY .mvn .mvn
+COPY mvnw .
+COPY mvnw.cmd .
 
-# Compile and package the application (assuming Maven is used)
+# Copy the pom.xml file to download dependencies
+COPY pom.xml .
+
+# Download the project dependencies
+RUN ./mvnw dependency:go-offline
+
+# Copy the rest of the project files
+COPY . .
+
+# Build the application
 RUN ./mvnw package
 
-# Specify the JAR file to run
-ENTRYPOINT ["java", "-jar", "target/simple-java-maven-app-1.0-SNAPSHOT.jar"]
+# Stage 2: Run the application
+FROM openjdk:8-jre-alpine
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the JAR file from the build stage
+COPY --from=build /app/target/simple-java-maven-app-1.0-SNAPSHOT.jar .
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "simple-java-maven-app-1.0-SNAPSHOT.jar"]
